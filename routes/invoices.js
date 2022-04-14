@@ -20,10 +20,15 @@ router.get("/", async function (req, res) {
 router.get("/:id", async function (req, res) {
   const id = req.params.id;
 
+  const codeResults = await db.query(`
+    SELECT comp_code FROM invoices
+    WHERE id = $1`, [id]);
+  const comp  = codeResults.rows[0];
+
   const iResults = await db.query(`
-    SELECT id, amt, paid, add_date, paid_date, comp_code
+    SELECT id, amt, paid, add_date, paid_date
     FROM invoices
-    WHERE id = $1`);
+    WHERE id = $1`, [id]);
   let invoice = iResults.rows[0];
 
   if (!invoice) throw new NotFoundError(`Not found: ${id}`);
@@ -31,7 +36,7 @@ router.get("/:id", async function (req, res) {
   const cResults = await db.query(`
     SELECT code, name, description
     FROM companies
-    WHERE code=$1`, [invoice.comp_code]);
+    WHERE code=$1`, [comp.comp_code]);
   const [company] = cResults.rows;
 
   invoice["company"] = company;
@@ -82,5 +87,22 @@ router.put("/:id", async function (req, res) {
 
   return res.json({ invoice });
 });
+
+
+/** Delete an invoice, returning {status: "Deleted"} */
+
+router.delete("/:id", async function (req, res) {
+  const id = req.params.id;
+
+  const invoice = await db.query(
+    "DELETE FROM invoices WHERE id = $1",
+    [req.params.id],
+  );
+
+  if (!invoice.rowCount) throw new NotFoundError(`Not found: ${id}`);
+
+  return res.json({ status: "Deleted" });
+});
+
 
 module.exports = router;

@@ -20,11 +20,20 @@ router.get("/", async function (req, res) {
 router.get("/:code", async function (req, res){
   const code = req.params.code;
 
-  const results = await db.query(
+  const cResults = await db.query(
     `SELECT code, name, description FROM companies
     WHERE code = $1`, [code]);
 
-  const [company] = results.rows;
+  let [company] = cResults.rows;
+
+  const iResults = await db.query(
+    `SELECT id, comp_code, amt, paid, add_date, paid_date
+    FROM invoices
+    WHERE comp_code = $1`, [code]);
+
+  const invoices = iResults.rows;
+
+  company.invoices = invoices;
 
   if (!company) throw new NotFoundError(`Not found: ${code}`);
 
