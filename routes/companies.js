@@ -29,16 +29,48 @@ router.get("/:code", async function (req, res){
   });
 
 
+/** Create new company, return company */
 
+router.post("/", async function (req, res) {
+  const { code, name, description } = req.body;
 
+  const result = await db.query(
+    `INSERT INTO companies (code, name, description)
+           VALUES ($1, $2, $3)
+           RETURNING code, name, description`,
+    [code, name, description],
+  );
+  const company = result.rows[0];
+  return res.status(201).json({ company });
+});
 
+/** Update company, returning company */
 
+router.put("/:code", async function (req, res) {
+  const { name, description } = req.body;
 
+  const result = await db.query(
+    `UPDATE companies
+           SET code=$1,
+               name=$2,
+               description=$3
+           WHERE code = $1
+           RETURNING code, name, description`,
+    [req.params.code, name, description],
+  );
+  const company = result.rows[0];
+  return res.json({ company });
+});
 
-/** DELETE /users/[id]: delete user, return {message: Deleted} */
-router.delete("/:id", function (req, res) {
-  db.User.delete(req.params.id);
+/** Delete company, returning {message: "Deleted"} */
+
+router.delete("/:code", async function (req, res) {
+  await db.query(
+    "DELETE FROM companies WHERE code = $1",
+    [req.params.code],
+  );
   return res.json({ message: "Deleted" });
 });
+
 
 module.exports = router;
