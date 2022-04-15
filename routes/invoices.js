@@ -20,28 +20,44 @@ router.get("/", async function (req, res) {
 router.get("/:id", async function (req, res) {
   const id = req.params.id;
 
-  const codeResults = await db.query(`
-    SELECT comp_code FROM invoices
-    WHERE id = $1`, [id]);
-  const comp  = codeResults.rows[0];
+  // const codeResults = await db.query(`
+  //   SELECT comp_code FROM invoices
+  //   WHERE id = $1`, [id]);
+  // const comp  = codeResults.rows[0];
+
+  // const cResults = await db.query(`
+  //   SELECT code, name, description
+  //   FROM companies
+  //   WHERE code=$1`, [invoice.comp_code]);
+  // const [company] = cResults.rows;
+
+  // invoice["company"] = company;
 
   const iResults = await db.query(`
-    SELECT id, amt, paid, add_date, paid_date
-    FROM invoices
-    WHERE id = $1`, [id]);
+  SELECT id, amt, paid, add_date, paid_date, name, description, code
+  FROM invoices
+  JOIN companies
+  ON comp_code = code
+  WHERE id = $1;`, [id]);
   let invoice = iResults.rows[0];
 
   if (!invoice) throw new NotFoundError(`Not found: ${id}`);
 
-  const cResults = await db.query(`
-    SELECT code, name, description
-    FROM companies
-    WHERE code=$1`, [comp.comp_code]);
-  const [company] = cResults.rows;
-
-  invoice["company"] = company;
-
-  return res.json({ invoice });
+  let result = {
+    "invoice" : {
+      "id": invoice.id,
+      "amt": invoice.amt,
+      "paid": invoice.paid,
+      "add_date": invoice.paid_date,
+      "paid_date": invoice.paid_date,
+      "company": {
+        "code": invoice.code,
+        "name": invoice.name,
+        "description": invoice.description
+      }
+    }
+  }
+  return res.json(result);
 });
 
 /** Create new invoice, return invoice */
@@ -71,21 +87,41 @@ router.post("/", async function (req, res) {
 /** Update invoice, returning invoice */
 
 router.put("/:id", async function (req, res) {
-  const { amt } = req.body;
+  const { amt, paid } = req.body;
   const invoiceId = req.params.id;
+  let currDate = new Date();
+  let invoicePaid = paid;
+
+  const iResults = await db.query(`
+  SELECT id, amt, paid, add_date, paid_date
+  FROM invoices
+  WHERE id = $1`, [invoiceId]);
+
+  let invoice = iResults.rows[0];
+  if (!invoice) throw new NotFoundError(`Not found: ${invoiceId}`);
+
+  if (!invoice.paid && paid === true){
+    invoicePaid = true;
+  }
+  else if (invoice.paid && paid === false){
+    invoicePaid = false;
+    currDate = null;
+  }
+  else{
+    currDate = invoice.paid_date;
+  }
 
   const result = await db.query(
     `UPDATE invoices
-           SET amt=$1
+           SET amt=$1, paid=$3, paid_date=$4
            WHERE id = $2
            RETURNING id, comp_code, amt, paid, add_date, paid_date`,
-    [amt, invoiceId]
+    [amt, invoiceId, invoicePaid, currDate]
   );
-  const invoice = result.rows[0];
 
-  if (!invoice) throw new NotFoundError(`Not found: ${invoiceId}`);
+  const invoice_result = result.rows[0];
+  return res.json({ invoice_result })
 
-  return res.json({ invoice });
 });
 
 
@@ -106,3 +142,4 @@ router.delete("/:id", async function (req, res) {
 
 
 module.exports = router;
+
